@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Brona</AssemblyName>
+    <RootNamespace>Brona</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\brona.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>Brona 浏览器选择器</Product>
+    <Description>点击链接时弹窗选择用哪个浏览器打开</Description>
+    <!-- 只保留中文资源，减少输出体积 -->
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+    <!-- 启用动态 PGO，提升热路径性能 -->
+    <TieredPGO>true</TieredPGO>
+    <!-- LibraryImport 源生成的 Win32 调用代码需要 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- 发布配置：预编译(ReadyToRun) 以缩短冷启动时间 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\brona.ico" />
+    <!-- 语言包：编译进程序，资源名为 Brona.Strings.{语言代码}.json -->
+    <EmbeddedResource Include="Strings\*.json" LogicalName="Brona.Strings.%(Filename).json" />
+  </ItemGroup>
+
+</Project>
