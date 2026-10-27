@@ -1,7 +1,7 @@
 # 生成程序图标 src/Brona/Assets/brona.ico
 # 设计：紫蓝渐变圆角方块 + 顶部高光 + 白色分叉箭头（一条链接，两条去路）
-# 用法：pwsh tools/make-icon.ps1 [预览PNG输出路径]
-param([string]$PreviewPath)
+# 用法：pwsh tools/make-icon.ps1 [-PreviewPath 预览PNG路径] [-PngPath 单个256px透明PNG路径]
+param([string]$PreviewPath, [string]$PngPath)
 
 Add-Type -AssemblyName System.Drawing
 $ErrorActionPreference = 'Stop'
@@ -129,4 +129,12 @@ if ($PreviewPath) {
     }
     $g.Dispose(); $pv.Save($PreviewPath); $pv.Dispose()
     Write-Host "预览图 $PreviewPath"
+}
+
+# 可选：导出单个 256px 透明背景图标（用于 README）
+if ($PngPath) {
+    $one = Render 256
+    $one.Save($PngPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $one.Dispose()
+    Write-Host "PNG 图标 $PngPath"
 }

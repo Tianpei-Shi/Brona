@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/icon.png" alt="Brona" width="420" />
+<img src="docs/images/icon.png" alt="Brona" width="128" />
 
 # Brona
 
