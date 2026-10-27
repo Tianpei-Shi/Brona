@@ -14,12 +14,13 @@ using Microsoft.Win32;
 namespace Brona.Views;
 
 /// <summary>
-/// 设置窗口：注册为默认浏览器、管理“我的浏览器”、外观与语言、测试弹窗。
+/// 设置窗口：注册为默认浏览器、管理“我的浏览器”、网址规则、功能开关、外观与语言、测试弹窗。
 /// </summary>
 public partial class SettingsWindow : Window
 {
     private readonly ObservableCollection<BrowserEntry> _mine = [];
     private readonly ObservableCollection<BrowserEntry> _detected = [];
+    private List<BrowserEntry>? _profiles; // 检测到的多用户配置条目（缓存，读文件有开销）
     private AppConfig _config = new();
     private DispatcherTimer? _saveTimer;
     private bool _loading; // 正在把配置填入界面，此时控件事件不触发保存
@@ -42,7 +43,11 @@ public partial class SettingsWindow : Window
             ThemeHelper.ApplyRoundCorners(this);
         };
         // 从系统设置切回来时刷新状态
-        Activated += (_, _) => RefreshStatus();
+        Activated += (_, _) =>
+        {
+            RefreshStatus();
+            ReloadExternalChanges();
+        };
         StateChanged += (_, _) => OnStateChanged();
         Loc.Changed += OnLanguageChanged;
         Closed += (_, _) => Loc.Changed -= OnLanguageChanged;
@@ -61,6 +66,8 @@ public partial class SettingsWindow : Window
 
         PageHome.Visibility = NavHome.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         PageBrowsers.Visibility = NavBrowsers.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PageRules.Visibility = NavRules.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PageFeatures.Visibility = NavFeatures.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         PageAppearance.Visibility = NavAppearance.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         PageAbout.Visibility = NavAbout.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
 
@@ -97,6 +104,8 @@ public partial class SettingsWindow : Window
         RefreshStatus();
         FillLanguageBox();
         FillPrivateTriggerBox();
+        FillRuleTypeBox();
+        RefreshRules();
     }
 
     private void OnLanguageChanged()
@@ -208,9 +217,11 @@ public partial class SettingsWindow : Window
         _mine.Clear();
         foreach (var b in _config.Browsers) _mine.Add(WithIcon(b));
         LoadAppearance();
+        LoadFeatures();
 
         _detected.Clear();
         foreach (var b in BrowserDetector.Detect()) _detected.Add(WithIcon(b));
+        _profiles = null; // 浏览器列表变了，多用户配置需要重新检测
 
         // 首次使用：自动把检测结果保存为用户的选择
         if (autoSave && !ConfigStore.Exists && _mine.Count > 0) SaveMine();
@@ -238,14 +249,34 @@ public partial class SettingsWindow : Window
         for (int i = 0; i < _mine.Count; i++) _mine[i].Shortcut = i < 9 ? (i + 1).ToString() : "·";
         MyList.Items.Refresh();
 
-        DetectedList.ItemsSource = _detected.Where(d => !_mine.Any(m => m.SameExe(d))).ToList();
+        // 候选 = 检测到的浏览器 + （开关打开时）它们的多用户配置；
+        // 去重按「程序 + 配置」比较，不能只比程序，否则同一浏览器的多个配置会被误当作重复项
+        DetectedList.ItemsSource = _detected.Concat(GetProfileCandidates())
+            .Where(d => !_mine.Any(m => m.SameEntry(d))).ToList();
+        ClearUsageButton.IsEnabled = _config.Usage.Count > 0 || _config.LastUsed.Length > 0;
+        RefreshRules();
         MyEmptyText.Visibility = _mine.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DetectedEmptyText.Visibility = DetectedList.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// 检测所有候选浏览器的多用户配置（开关关闭时不读取任何文件）。
+    /// 以检测到的浏览器为准（名称干净），再补上用户手动添加、没被检测到的程序。
+    /// </summary>
+    private List<BrowserEntry> GetProfileCandidates()
+    {
+        if (!_config.DetectProfiles) return [];
+        if (_profiles is not null) return _profiles;
+
+        var bases = _detected.ToList();
+        bases.AddRange(_mine.Where(m => m.Profile.Length == 0 && !bases.Any(b => b.SameExe(m))));
+        _profiles = bases.SelectMany(BrowserDetector.DetectProfiles).Select(WithIcon).ToList();
+        return _profiles;
+    }
+
     private void AddDetected_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: BrowserEntry b } || _mine.Any(m => m.SameExe(b))) return;
+        if (sender is not Button { Tag: BrowserEntry b } || _mine.Any(m => m.SameEntry(b))) return;
         _mine.Add(b);
         SaveMine();
     }
@@ -269,7 +300,7 @@ public partial class SettingsWindow : Window
         }
 
         var entry = WithIcon(BrowserDetector.FromExe(path));
-        if (_mine.Any(m => m.SameExe(entry))) return;
+        if (_mine.Any(m => m.SameEntry(entry))) return;
         _mine.Add(entry);
         SaveMine();
     }
@@ -447,6 +478,210 @@ public partial class SettingsWindow : Window
         if (_loading) return;
         _config.ShowPrivateButton = ShowPrivateToggle.IsChecked == true;
         SaveMine();
+    }
+
+    // ================= 功能开关 =================
+
+    /// <summary>把配置中的功能开关显示到控件上（不触发保存）</summary>
+    private void LoadFeatures()
+    {
+        _loading = true;
+        RulesToggle.IsChecked = _config.EnableRules;
+        ProfilesToggle.IsChecked = _config.DetectProfiles;
+        SortUsageToggle.IsChecked = _config.SortByUsage;
+        RememberLastToggle.IsChecked = _config.RememberLast;
+        LinkCheckToggle.IsChecked = _config.EnableLinkCheck;
+        QrToggle.IsChecked = _config.ShowQrButton;
+        _loading = false;
+    }
+
+    /// <summary>任一功能开关被点击：读取全部开关并立即保存</summary>
+    private void Feature_Click(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _config.EnableRules = RulesToggle.IsChecked == true;
+        _config.DetectProfiles = ProfilesToggle.IsChecked == true;
+        _config.SortByUsage = SortUsageToggle.IsChecked == true;
+        _config.RememberLast = RememberLastToggle.IsChecked == true;
+        _config.EnableLinkCheck = LinkCheckToggle.IsChecked == true;
+        _config.ShowQrButton = QrToggle.IsChecked == true;
+        SaveMine(); // 刷新候选列表时会按「检测多用户配置」开关显示 / 隐藏配置条目
+    }
+
+    /// <summary>清除使用记录（排序依据和上次选择）</summary>
+    private void ClearUsage_Click(object sender, RoutedEventArgs e)
+    {
+        UsageTracker.Clear(_config);
+        SaveMine();
+    }
+
+    /// <summary>
+    /// 弹窗是另一个进程，会写入使用记录和「记住此网站」规则。
+    /// 窗口重新激活时把这些数据同步回来，避免之后保存时用旧数据覆盖它们。
+    /// </summary>
+    private void ReloadExternalChanges()
+    {
+        if (_loading || !ConfigStore.Exists || (_saveTimer?.IsEnabled ?? false)) return;
+        try
+        {
+            var fresh = ConfigStore.Load();
+            _config.Rules = fresh.Rules;
+            _config.Usage = fresh.Usage;
+            _config.LastUsed = fresh.LastUsed;
+            RefreshRules();
+            ClearUsageButton.IsEnabled = _config.Usage.Count > 0 || _config.LastUsed.Length > 0;
+        }
+        catch
+        {
+            // 读取失败就保持界面现状
+        }
+    }
+
+    // ================= 网址规则 =================
+
+    /// <summary>规则列表中的一行（界面用，包装一条规则及其浏览器信息）</summary>
+    public sealed class RuleRow
+    {
+        public required UrlRule Rule { get; init; }
+        public string Pattern => Rule.Pattern;
+        public string TypeLabel { get; init; } = "";
+        public string BrowserName { get; init; } = "";
+        public ImageSource? Icon { get; init; }
+        public bool IsPrivate => Rule.Private;
+        /// <summary>规则指向的浏览器已不在列表中</summary>
+        public bool Missing { get; init; }
+
+        public bool Enabled
+        {
+            get => Rule.Enabled;
+            set => Rule.Enabled = value;
+        }
+    }
+
+    /// <summary>匹配方式下拉框</summary>
+    private void FillRuleTypeBox()
+    {
+        var selected = (RuleTypeBox.SelectedItem as ComboBoxItem)?.Tag as string ?? RuleMatchTypes.Domain;
+        _loading = true;
+        RuleTypeBox.Items.Clear();
+        foreach (var t in RuleMatchTypes.All)
+            RuleTypeBox.Items.Add(new ComboBoxItem { Content = Loc.Get($"S.Rules.Type.{t}"), Tag = t });
+        RuleTypeBox.SelectedItem = RuleTypeBox.Items.Cast<ComboBoxItem>().First(i => (string)i.Tag == selected);
+        _loading = false;
+        UpdateRuleExample();
+    }
+
+    /// <summary>浏览器下拉框：列出「我的浏览器」，尽量保持原来的选择</summary>
+    private void FillRuleBrowserBox()
+    {
+        var selected = (RuleBrowserBox.SelectedItem as ComboBoxItem)?.Tag as BrowserEntry;
+        RuleBrowserBox.Items.Clear();
+        foreach (var b in _mine) RuleBrowserBox.Items.Add(new ComboBoxItem { Content = b.Name, Tag = b });
+        RuleBrowserBox.SelectedItem = RuleBrowserBox.Items.Cast<ComboBoxItem>()
+            .FirstOrDefault(i => selected is not null && ((BrowserEntry)i.Tag).Key == selected.Key)
+            ?? (RuleBrowserBox.Items.Count > 0 ? RuleBrowserBox.Items[0] : null);
+    }
+
+    /// <summary>重建规则列表</summary>
+    private void RefreshRules()
+    {
+        FillRuleBrowserBox();
+        var rows = new List<RuleRow>();
+        foreach (var r in _config.Rules)
+        {
+            var browser = RuleMatcher.FindBrowser(_config, r);
+            rows.Add(new RuleRow
+            {
+                Rule = r,
+                TypeLabel = Loc.Get($"S.Rules.Type.{r.MatchType}"),
+                BrowserName = browser?.Name ?? Loc.Get("S.Rules.Missing"),
+                Icon = browser is null ? null : WithIcon(browser).Icon,
+                Missing = browser is null,
+            });
+        }
+        RuleList.ItemsSource = rows;
+        RulesEmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void RuleType_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        UpdateRuleExample();
+        RuleErrorText.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>按当前匹配方式显示示例（示例本身不翻译，只翻译「例如」）</summary>
+    private void UpdateRuleExample()
+    {
+        if (RuleTypeBox.SelectedItem is not ComboBoxItem { Tag: string t }) return;
+        var example = t switch
+        {
+            RuleMatchTypes.Wildcard => "https://*.example.com/docs/*",
+            RuleMatchTypes.Regex => @"^https://(www\.)?example\.com/",
+            _ => "github.com",
+        };
+        RuleExampleText.Text = Loc.Format("S.Rules.Eg", example);
+    }
+
+    /// <summary>输入变化时清除上一次的错误提示</summary>
+    private void RuleInput_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (RuleErrorText is not null) RuleErrorText.Visibility = Visibility.Collapsed;
+    }
+
+    private void RulePattern_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) AddRule_Click(sender, e);
+    }
+
+    /// <summary>校验输入并添加一条规则；不合法时给出提示，不添加</summary>
+    private void AddRule_Click(object sender, RoutedEventArgs e)
+    {
+        var pattern = RulePatternBox.Text.Trim();
+        var type = (RuleTypeBox.SelectedItem as ComboBoxItem)?.Tag as string ?? RuleMatchTypes.Domain;
+
+        if (pattern.Length == 0) { ShowRuleError("S.Rules.ErrEmpty"); return; }
+        if (RuleBrowserBox.SelectedItem is not ComboBoxItem { Tag: BrowserEntry browser }) { ShowRuleError("S.Rules.ErrNoBrowser"); return; }
+
+        if (type == RuleMatchTypes.Regex && !RuleMatcher.IsValidRegex(pattern)) { ShowRuleError("S.Rules.ErrRegex"); return; }
+        if (type == RuleMatchTypes.Domain)
+        {
+            // 用户可能粘贴了完整网址：只取其中的主机名
+            var candidate = pattern.Contains("://") ? pattern : "http://" + pattern;
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var parsed) || parsed.Host.Length == 0)
+            {
+                ShowRuleError("S.Rules.ErrEmpty");
+                return;
+            }
+            pattern = parsed.IdnHost.ToLowerInvariant();
+        }
+
+        _config.Rules.Add(new UrlRule
+        {
+            Pattern = pattern,
+            MatchType = type,
+            BrowserExe = browser.ExePath,
+            BrowserArguments = browser.Arguments ?? "",
+            Private = RulePrivateToggle.IsChecked == true && browser.SupportsPrivate,
+            Enabled = true,
+        });
+        RulePatternBox.Clear();
+        RuleErrorText.Visibility = Visibility.Collapsed;
+        SaveMine();
+    }
+
+    /// <summary>在添加区下方显示错误提示</summary>
+    private void ShowRuleError(string key)
+    {
+        RuleErrorText.Text = Loc.Get(key);
+        RuleErrorText.Visibility = Visibility.Visible;
+    }
+
+    private void RuleToggle_Click(object sender, RoutedEventArgs e) => SaveMine();
+
+    private void RuleDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: RuleRow row } && _config.Rules.Remove(row.Rule)) SaveMine();
     }
 
     // ================= 测试 =================

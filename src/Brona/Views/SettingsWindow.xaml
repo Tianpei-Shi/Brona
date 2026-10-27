@@ -203,6 +203,10 @@
                              Tag="&#xE80F;" IsChecked="True" Checked="Nav_Checked" />
                 <RadioButton x:Name="NavBrowsers" Style="{StaticResource NavItem}" Content="{DynamicResource S.Nav.Browsers}"
                              Tag="&#xE774;" Checked="Nav_Checked" />
+                <RadioButton x:Name="NavRules" Style="{StaticResource NavItem}" Content="{DynamicResource S.Nav.Rules}"
+                             Tag="&#xE71C;" Checked="Nav_Checked" />
+                <RadioButton x:Name="NavFeatures" Style="{StaticResource NavItem}" Content="{DynamicResource S.Nav.Features}"
+                             Tag="&#xE945;" Checked="Nav_Checked" />
                 <RadioButton x:Name="NavAppearance" Style="{StaticResource NavItem}" Content="{DynamicResource S.Nav.Appearance}"
                              Tag="&#xE790;" Checked="Nav_Checked" />
                 <RadioButton x:Name="NavAbout" Style="{StaticResource NavItem}" Content="{DynamicResource S.Nav.About}"
@@ -390,6 +394,200 @@
                         </ItemsControl>
                         <TextBlock x:Name="DetectedEmptyText" Style="{StaticResource CardHint}" Visibility="Collapsed"
                                    Text="{DynamicResource S.Browsers.DetectedEmpty}" />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ========== 页面：规则 ========== -->
+                <ScrollViewer x:Name="PageRules" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                    <StackPanel Margin="32,16,32,28">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource S.Rules.Title}" />
+                        <TextBlock Style="{StaticResource CardHint}" Text="{DynamicResource S.Rules.Hint}" />
+
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource S.Rules.List}" />
+                        <ItemsControl x:Name="RuleList" Background="Transparent">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- 一行一条规则：匹配内容 / 匹配方式 / 浏览器 / 无痕 / 启用开关 / 删除 -->
+                                    <Border CornerRadius="10" BorderThickness="1" Padding="14,10,8,10" Margin="0,0,0,8"
+                                            Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}">
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE74D;"
+                                                    VerticalAlignment="Center" Cursor="Hand" ToolTip="{DynamicResource S.Browsers.Remove}"
+                                                    Tag="{Binding}" Click="RuleDelete_Click" />
+                                            <CheckBox DockPanel.Dock="Right" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center"
+                                                      Margin="10,0,6,0" IsChecked="{Binding Enabled, Mode=TwoWay}" Click="RuleToggle_Click" />
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                                <Image Source="{Binding Icon}" Width="18" Height="18" Margin="0,0,7,0"
+                                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                                <TextBlock x:Name="BrowserLabel" Text="{Binding BrowserName}" FontSize="12.5" MaxWidth="130"
+                                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            </StackPanel>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Pattern}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                           FlowDirection="LeftToRight" HorizontalAlignment="Left"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}" ToolTip="{Binding Pattern}" />
+                                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                    <TextBlock Text="{Binding TypeLabel}" FontSize="11.5" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                                    <!-- 无痕标记 -->
+                                                    <Border x:Name="PrivateBadge" CornerRadius="9" Padding="7,0,7,1" Margin="8,0,0,0"
+                                                            VerticalAlignment="Center" Background="{DynamicResource AccentSoftBrush}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE727;" FontSize="9.5"
+                                                                       VerticalAlignment="Center" Margin="0,1,4,0"
+                                                                       Foreground="{DynamicResource AccentBrush}" />
+                                                            <TextBlock Text="{DynamicResource S.Picker.Private}" FontSize="11"
+                                                                       Foreground="{DynamicResource AccentBrush}" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsPrivate}" Value="False">
+                                            <Setter TargetName="PrivateBadge" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <!-- 浏览器已被移除：用红色提示 -->
+                                        <DataTrigger Binding="{Binding Missing}" Value="True">
+                                            <Setter TargetName="BrowserLabel" Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="RulesEmptyText" Style="{StaticResource CardHint}" Visibility="Collapsed"
+                                   Text="{DynamicResource S.Rules.Empty}" />
+
+                        <!-- 添加规则 -->
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="{DynamicResource S.Rules.Add}" />
+                        <Border Style="{StaticResource Panel}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="140" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="RulePatternBox" Style="{StaticResource InputBox}" FlowDirection="LeftToRight"
+                                             TextChanged="RuleInput_Changed" KeyDown="RulePattern_KeyDown" />
+                                    <ComboBox x:Name="RuleTypeBox" Grid.Column="2" Style="{StaticResource SimpleCombo}"
+                                              SelectionChanged="RuleType_Changed" />
+                                </Grid>
+                                <TextBlock x:Name="RuleExampleText" FontSize="11.5" Margin="2,6,0,0" FlowDirection="LeftToRight"
+                                           HorizontalAlignment="Left" Foreground="{DynamicResource TextTertiaryBrush}" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="RuleBrowserBox" Style="{StaticResource SimpleCombo}" />
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <CheckBox x:Name="RulePrivateToggle" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{DynamicResource S.Picker.Private}" FontSize="12.5" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="4" Style="{StaticResource PrimaryButton}" Content="{DynamicResource S.Rules.AddButton}"
+                                            Click="AddRule_Click" />
+                                </Grid>
+                                <!-- 正则不合法等错误提示 -->
+                                <TextBlock x:Name="RuleErrorText" Visibility="Collapsed" FontSize="12" Margin="2,8,0,0" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource DangerBrush}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ========== 页面：功能 ========== -->
+                <ScrollViewer x:Name="PageFeatures" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                    <StackPanel Margin="32,16,32,28">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{DynamicResource S.Features.Title}" />
+                        <TextBlock Style="{StaticResource CardHint}" Text="{DynamicResource S.Features.Hint}" />
+
+                        <Border Style="{StaticResource Panel}" Margin="0,14,0,0">
+                            <DockPanel>
+                                <CheckBox x:Name="RulesToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitch}"
+                                          VerticalAlignment="Center" Margin="12,0,0,0" Click="Feature_Click" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Features.Rules}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{DynamicResource S.Features.RulesHint}" FontSize="11.5" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Panel}">
+                            <DockPanel>
+                                <CheckBox x:Name="ProfilesToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitch}"
+                                          VerticalAlignment="Center" Margin="12,0,0,0" Click="Feature_Click" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Features.Profiles}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{DynamicResource S.Features.ProfilesHint}" FontSize="11.5" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Panel}">
+                            <DockPanel>
+                                <CheckBox x:Name="SortUsageToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitch}"
+                                          VerticalAlignment="Center" Margin="12,0,0,0" Click="Feature_Click" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Features.SortUsage}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{DynamicResource S.Features.SortUsageHint}" FontSize="11.5" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Panel}">
+                            <DockPanel>
+                                <CheckBox x:Name="RememberLastToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitch}"
+                                          VerticalAlignment="Center" Margin="12,0,0,0" Click="Feature_Click" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Features.RememberLast}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{DynamicResource S.Features.RememberLastHint}" FontSize="11.5" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Panel}">
+                            <DockPanel>
+                                <CheckBox x:Name="LinkCheckToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitch}"
+                                          VerticalAlignment="Center" Margin="12,0,0,0" Click="Feature_Click" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Features.LinkCheck}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{DynamicResource S.Features.LinkCheckHint}" FontSize="11.5" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource Panel}">
+                            <DockPanel>
+                                <CheckBox x:Name="QrToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitch}"
+                                          VerticalAlignment="Center" Margin="12,0,0,0" Click="Feature_Click" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Features.Qr}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{DynamicResource S.Features.QrHint}" FontSize="11.5" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- 清除使用记录 -->
+                        <Border Style="{StaticResource Panel}">
+                            <DockPanel>
+                                <Button x:Name="ClearUsageButton" DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}"
+                                        VerticalAlignment="Center" Margin="12,0,0,0" Content="{DynamicResource S.Features.ClearUsageButton}"
+                                        Click="ClearUsage_Click" />
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource S.Features.ClearUsage}" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{DynamicResource S.Features.ClearUsageHint}" FontSize="11.5" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 

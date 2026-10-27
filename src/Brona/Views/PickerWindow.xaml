@@ -16,6 +16,35 @@
         <sys:Double x:Key="TileWidth">76</sys:Double>
         <sys:Double x:Key="TileHeight">64</sys:Double>
         <Visibility x:Key="PrivateChipVisibility">Visible</Visibility>
+
+        <!-- 「记住此网站的选择」：不显眼的小复选项，不抢键盘焦点 -->
+        <Style x:Key="RememberChip" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <TextBlock x:Name="Box" FontFamily="{StaticResource IconFont}" Text="&#xE739;" FontSize="12"
+                                       Margin="0,1,6,0" VerticalAlignment="Center" />
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Text" Value="&#xE73A;" />
+                                <Setter TargetName="Box" Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- 外边距给阴影留出空间 -->
@@ -42,6 +71,16 @@
                 <!-- 顶部一行：链接 + 无痕 / 复制 / 设置 / 关闭，可拖动 -->
                 <DockPanel MouseLeftButtonDown="Header_MouseDown" Background="Transparent">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
+                        <!-- 二维码：用小图形绘制图标；不抢焦点，保持磁贴的键盘选中状态 -->
+                        <Button x:Name="QrButton" Style="{StaticResource IconButton}" Width="24" Height="24" Focusable="False"
+                                ToolTip="{DynamicResource S.Qr.Tip}" Click="Qr_Click">
+                            <Path Width="11" Height="11" Stretch="Uniform"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  Data="F0 M0,0 H5 V5 H0 Z M1.2,1.2 V3.8 H3.8 V1.2 Z M2,2 H3 V3 H2 Z
+                                        M7,0 H12 V5 H7 Z M8.2,1.2 V3.8 H10.8 V1.2 Z M9,2 H10 V3 H9 Z
+                                        M0,7 H5 V12 H0 Z M1.2,8.2 V10.8 H3.8 V8.2 Z M2,9 H3 V10 H2 Z
+                                        M7,7 H9 V9 H7 Z M10,7 H12 V8.5 H10 Z M10,10 H12 V12 H10 Z M7.5,10.5 H9 V12 H7.5 Z" />
+                        </Button>
                         <Button Style="{StaticResource IconButton}" Width="24" Height="24" FontSize="11"
                                 ToolTip="{DynamicResource S.Picker.CopyTip}" Click="Copy_Click">
                             <TextBlock x:Name="CopyIcon" Text="&#xE8C8;" />
@@ -53,6 +92,10 @@
                     </StackPanel>
                     <TextBlock x:Name="SchemeIcon" FontFamily="{StaticResource IconFont}" FontSize="11"
                                VerticalAlignment="Center" Margin="2,1,7,0" />
+                    <!-- 链接安全检查有警告时显示，悬停查看原因；不阻止打开 -->
+                    <TextBlock x:Name="WarnIcon" Visibility="Collapsed" Text="&#xE7BA;" FontFamily="{StaticResource IconFont}"
+                               FontSize="12" VerticalAlignment="Center" Margin="0,1,7,0" Cursor="Help"
+                               Foreground="{DynamicResource WarningBrush}" />
                     <!-- 网址始终从左到右显示，不随界面语言镜像 -->
                     <TextBlock x:Name="UrlText" TextTrimming="CharacterEllipsis" MaxWidth="360" FlowDirection="LeftToRight"
                                HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="12">
@@ -137,6 +180,21 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
+
+                <!-- 链接二维码：点击顶部二维码按钮展开，供手机扫码；Esc 先收起它 -->
+                <StackPanel x:Name="QrPanel" Visibility="Collapsed" Margin="0,12,8,0" HorizontalAlignment="Center">
+                    <Border Background="White" CornerRadius="8" Padding="0" HorizontalAlignment="Center"
+                            BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Height="170" Width="170">
+                        <Image x:Name="QrImage" Width="168" Height="168" RenderOptions.EdgeMode="Aliased" />
+                    </Border>
+                    <TextBlock x:Name="QrHint" FontSize="11" Margin="0,8,0,0" HorizontalAlignment="Center"
+                               TextAlignment="Center" TextWrapping="Wrap" MaxWidth="240"
+                               Foreground="{DynamicResource TextTertiaryBrush}" />
+                </StackPanel>
+
+                <!-- 记住此网站的选择：勾选后，下一次点浏览器时添加一条域名规则 -->
+                <CheckBox x:Name="RememberBox" Style="{StaticResource RememberChip}" Visibility="Collapsed"
+                          Margin="0,12,0,0" HorizontalAlignment="Left" Content="{DynamicResource S.Rules.Remember}" />
             </StackPanel>
         </Border>
     </Grid>

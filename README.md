@@ -28,10 +28,14 @@
 - **随时取消**：「取消」按钮、`Esc`、点弹窗外部都会直接关闭，不打开任何浏览器；弹窗刚出现的 0.3 秒内忽略鼠标点击，防止双击链接误触。
 - **无痕模式**：每个浏览器下方有「无痕」按钮；也可以设置为 **右键 / Ctrl + 左键 / Shift + 左键** 无痕打开，键盘 `Shift + 数字` 始终为无痕。自动识别 Edge（`--inprivate`）、Firefox 系（`-private-window`）、Opera（`--private`）、Chromium 内核（`--incognito`）。
 - **浏览器由你决定**：自动检测已安装的浏览器作为候选，可手动添加任意浏览器 exe，**拖拽排序**，顺序即数字快捷键。
+- **网址规则**（可开关）：按 **域名 / 通配符 / 正则** 自动用指定浏览器（可选无痕）打开，命中后不再弹窗；弹窗里勾选「记住此网站的选择」即可一键生成规则，点链接时按住 `Shift` 可临时跳过规则。
+- **浏览器多用户配置**（可开关）：自动读取 Chrome / Edge / Brave / Vivaldi 的多个用户配置和 Firefox 的配置文件，在「浏览器」页作为独立选项添加（如「Chrome · 工作」）。
+- **按使用频率排序 / 记住上次选择**（均可选）：弹窗中常用的浏览器排在前面，数字快捷键跟随显示顺序；也可以让上次用的浏览器默认选中，直接按 `Enter`；设置里可一键清除使用记录。
+- **链接安全检查与二维码**（可开关）：纯本地检查，不联网——提醒 punycode / 混合文字域名、纯 IP、未加密 http、带 `@` 的用户信息、非默认端口、超长链接、常见短链；弹窗标题栏有二维码按钮，手机扫码即可打开链接。
 - **个性化**：浏览器间距、图标大小可调；跟随系统深浅色。
 - **40 种界面语言**：跟随系统或手动切换，立即生效；阿拉伯语、希伯来语、波斯语、乌尔都语自动从右到左排版。
 - **安全**：只接受 `http` / `https` 链接和本地网页文件，拒绝 `javascript:` 等协议；链接规范化转义后再交给浏览器，无法注入命令行参数；只写当前用户注册表，无需管理员权限。
-- **无缓存**：唯一写入的文件是 `%AppData%\Brona\browsers.json`（浏览器列表和个性化设置），取消注册时一并删除。
+- **无缓存**：唯一写入的文件是 `%AppData%\Brona\browsers.json`（浏览器列表、网址规则、功能开关、使用记录和个性化设置），取消注册时一并删除。
 
 ## 快捷键（弹窗中）
 
@@ -41,7 +45,7 @@
 | `Shift` + `1`–`9` | 无痕打开 |
 | `←` `→` / `Tab` | 切换选中项 |
 | `Enter` / `Shift + Enter` | 打开 / 无痕打开选中的浏览器 |
-| `Esc` | 取消 |
+| `Esc` | 关闭二维码（展开时）/ 取消 |
 | `Ctrl + C` | 复制链接 |
 
 ## 安装
@@ -75,10 +79,10 @@ dotnet publish src/Brona/Brona.csproj -c Release -o dist
 | 自动检测浏览器 | ✅ | ✅ | ✅ | ✅ |
 | 无痕打开 | ✅ 按钮 / 右键 / Ctrl / Shift 可选 | — | ✅ | ✅ |
 | 拖拽排序 | ✅ | — | — | — |
-| 按网址规则自动选择 | 规划中 | ✅ | ✅ | ✅ |
-| 浏览器多用户配置 | 规划中 | ✅ | — | ✅ |
-| 按使用频率排序 | 规划中 | ✅ | — | — |
-| 链接安全检查 / 二维码 | 规划中 | — | — | ✅ |
+| 按网址规则自动选择 | ✅ 域名 / 通配符 / 正则 | ✅ | ✅ | ✅ |
+| 浏览器多用户配置 | ✅ 自动检测 | ✅ | — | ✅ |
+| 按使用频率排序 | ✅ 可选 | ✅ | — | — |
+| 链接安全检查 / 二维码 | ✅ 本地检查 + 二维码 | — | — | ✅ |
 
 > 「—」表示该项目 README 中没有提及，不代表一定不支持。
 
@@ -86,16 +90,12 @@ dotnet publish src/Brona/Brona.csproj -c Release -o dist
 
 按优先级排列，欢迎在 Issue 中讨论：
 
-1. **网址规则**：按域名 / 通配符 / 正则自动用指定浏览器打开；弹窗中加「记住此网站的选择」。
-2. **浏览器多用户配置**：Chrome / Edge / Firefox 的多个配置（如「工作」「个人」）作为独立选项。
-3. **链接清洗**：去除 `utm_*` 等跟踪参数；展开 Outlook SafeLinks 以及 QQ、微信等的中间跳转页。
-4. **来源程序识别**：按点击链接的程序（微信、钉钉、飞书……）设定默认浏览器。
-5. **商店版浏览器检测**：通过系统接口列出能打开链接的所有程序，覆盖微软商店安装的浏览器。
-6. **按使用频率排序**（可选）、记住上次选择。
-7. **链接安全检查与二维码**：一键用手机扫码打开。
-8. **更快弹出**：可选的托盘常驻预热、开机自启。
-9. **分发**：安装包、winget / Scoop、自动更新。
-10. **外观**：手动深浅色切换、自定义主题色。
+1. **链接清洗**：去除 `utm_*` 等跟踪参数；展开 Outlook SafeLinks 以及 QQ、微信等的中间跳转页。
+2. **来源程序识别**：按点击链接的程序（微信、钉钉、飞书……）设定默认浏览器。
+3. **商店版浏览器检测**：通过系统接口列出能打开链接的所有程序，覆盖微软商店安装的浏览器。
+4. **更快弹出**：可选的托盘常驻预热、开机自启。
+5. **分发**：安装包、winget / Scoop、自动更新。
+6. **外观**：手动深浅色切换、自定义主题色。
 
 ## 参与翻译
 
@@ -109,9 +109,15 @@ dotnet publish src/Brona/Brona.csproj -c Release -o dist
 src/Brona/
 ├─ App.xaml(.cs)                 入口：带链接参数显示选择弹窗，否则显示设置窗口
 ├─ Views/PickerWindow            选择弹窗
-├─ Views/SettingsWindow          设置窗口（概览 / 浏览器 / 个性化 / 关于）
-├─ Services/BrowserDetector      自动检测浏览器、识别无痕参数
+├─ Views/SettingsWindow          设置窗口（概览 / 浏览器 / 规则 / 功能 / 个性化 / 关于）
+├─ Models/AppConfig              用户配置（含各功能开关）
+├─ Models/UrlRule                网址规则（域名 / 通配符 / 正则）
+├─ Services/BrowserDetector      自动检测浏览器与多用户配置、识别无痕参数
 ├─ Services/BrowserLauncher      链接校验与安全启动
+├─ Services/RuleMatcher          网址规则匹配与「记住此网站的选择」
+├─ Services/UsageTracker         使用频率统计与上次选择
+├─ Services/LinkInspector        链接安全检查（纯本地）
+├─ Services/QrCodeHelper         二维码生成（QRCoder，自绘为 WPF 矢量图）
 ├─ Services/ConfigStore          用户配置读写
 ├─ Services/RegistrationService  注册 / 取消注册为系统浏览器
 ├─ Services/Loc                  多语言
@@ -137,6 +143,10 @@ install.ps1                      一键编译、安装、注册
 - Cancel with the button, `Esc`, or by clicking outside
 - Private mode: a Private button under each browser, or right-click / Ctrl+click / Shift+click (configurable); `Shift + number` always opens privately
 - Auto-detects installed browsers, add any browser manually, drag to reorder
+- URL rules (optional): open links from a domain / wildcard / regex straight in a chosen browser, or tick "Remember my choice for this site" in the popup; hold Shift while clicking a link to skip rules
+- Browser profiles (optional): Chrome / Edge / Brave / Vivaldi profiles and Firefox profiles show up as separate choices
+- Sort by usage and remember the last choice (both optional)
+- Link safety check and QR code (optional): local-only heuristics (punycode, raw IP, plain http, userinfo, odd ports, very long URLs, short-link services) with no network access, plus a QR button to open the link on your phone
 - Adjustable spacing and icon size, light/dark theme
 - 40 interface languages with right-to-left support
 - Safe: only `http`/`https` links and local web pages; per-user registration, no admin rights; no caches

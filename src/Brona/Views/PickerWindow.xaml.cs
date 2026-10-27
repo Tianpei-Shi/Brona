@@ -26,8 +26,12 @@ public partial class PickerWindow : Window
     private readonly Stopwatch _shownTimer = new();
     private bool _closing;
     private string _privateTrigger = PrivateTriggers.RightClick;
+    private AppConfig _config = new();
+    private int _initialIndex; // 弹出时获得键盘焦点的磁贴序号
 
-    public PickerWindow(string rawUrl)
+    /// <param name="rawUrl">系统传入的链接</param>
+    /// <param name="config">已读取的配置；省略时自行读取</param>
+    public PickerWindow(string rawUrl, AppConfig? config = null)
     {
         InitializeComponent();
         FlowDirection = Loc.Direction; // 阿拉伯语等从右到左的语言整体镜像
@@ -47,9 +51,14 @@ public partial class PickerWindow : Window
         _uri = uri;
 
         // 读取用户配置：浏览器列表 + 外观
-        var config = ConfigStore.Load();
+        config ??= ConfigStore.Load();
+        _config = config;
         ApplyAppearance(config);
-        _browsers = config.Browsers;
+        // 按使用次数排序时只影响显示顺序，不改动配置里用户手动排好的顺序
+        _browsers = config.SortByUsage ? UsageTracker.SortByCount(config, config.Browsers) : config.Browsers;
+        // 记住上次选择：让上次用的那一项获得初始焦点，直接按 Enter 即可打开
+        if (config.RememberLast)
+            _initialIndex = Math.Max(0, _browsers.FindIndex(b => string.Equals(b.Key, config.LastUsed, StringComparison.OrdinalIgnoreCase)));
         for (int i = 0; i < _browsers.Count; i++)
         {
             _browsers[i].Icon = IconHelper.Load(_browsers[i].ExePath);
@@ -59,6 +68,7 @@ public partial class PickerWindow : Window
         EmptyPanel.Visibility = _browsers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         ShowUrl(uri);
+        SetupExtras(uri, config);
 
         Loaded += OnLoaded;
         Deactivated += OnDeactivated;
@@ -113,6 +123,31 @@ public partial class PickerWindow : Window
         UrlText.ToolTip = (secure ? "" : Loc.Get("S.Picker.Insecure") + "\n") + uri.AbsoluteUri;
     }
 
+    /// <summary>按功能开关设置安全警告、二维码按钮和「记住此网站」复选框</summary>
+    private void SetupExtras(Uri uri, AppConfig config)
+    {
+        // 链接安全检查：有警告才显示图标，ToolTip 列出原因
+        if (config.EnableLinkCheck)
+        {
+            var warnings = LinkInspector.Inspect(uri);
+            if (warnings.Count > 0)
+            {
+                WarnIcon.ToolTip = string.Join("\n", warnings.Select(w => "• " + w));
+                WarnIcon.Visibility = Visibility.Visible;
+            }
+        }
+
+        // 本地文件的二维码对手机没有意义
+        QrButton.Visibility = config.ShowQrButton && !uri.IsFile ? Visibility.Visible : Visibility.Collapsed;
+
+        // 网址规则：只有启用规则且链接有域名时才能记住
+        if (config.EnableRules && RuleMatcher.RememberDomain(uri) is { } domain)
+        {
+            RememberBox.ToolTip = domain;
+            RememberBox.Visibility = Visibility.Visible;
+        }
+    }
+
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         CenterOnCursorScreen();
@@ -120,8 +155,8 @@ public partial class PickerWindow : Window
         PlayShowAnimation();
         _shownTimer.Start();
 
-        // 默认选中第一个浏览器，直接按 Enter 即可打开
-        Dispatcher.BeginInvoke(DispatcherPriority.Input, () => GetTile(0)?.Focus());
+        // 默认选中第一个浏览器（开启「记住上次选择」时为上次用的），直接按 Enter 即可打开
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () => GetTile(_initialIndex)?.Focus());
     }
 
     /// <summary>
@@ -209,7 +244,9 @@ public partial class PickerWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                Cancel();
+                // 二维码展开时，Esc 先收起二维码，再按一次才取消弹窗
+                if (QrPanel.Visibility == Visibility.Visible) ToggleQr(false);
+                else Cancel();
                 e.Handled = true;
                 break;
             case Key.Enter when Keyboard.FocusedElement is Button { Tag: BrowserEntry b }:
@@ -262,16 +299,40 @@ public partial class PickerWindow : Window
         _closing = true;
         Hide(); // 先隐藏，让用户感觉“瞬间”响应
 
+        bool opened = false;
         try
         {
             BrowserLauncher.Open(browser, _uri, inPrivate);
+            opened = true;
         }
         catch (Exception ex)
         {
             MessageBox.Show(Loc.Format("S.Picker.LaunchFailed", browser.Name, ex.Message), "Brona",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
+        if (opened) SaveChoice(browser, inPrivate);
         Application.Current.Shutdown();
+    }
+
+    /// <summary>打开成功后记录使用统计，并按需添加「记住此网站」规则；只在有改动时写一次配置</summary>
+    private void SaveChoice(BrowserEntry browser, bool inPrivate)
+    {
+        bool dirty = UsageTracker.Record(_config, browser);
+        if (_uri is not null && RememberBox.Visibility == Visibility.Visible && RememberBox.IsChecked == true)
+        {
+            RuleMatcher.RememberChoice(_config, _uri, browser, inPrivate);
+            dirty = true;
+        }
+        if (!dirty) return;
+
+        try
+        {
+            ConfigStore.Save(_config);
+        }
+        catch
+        {
+            // 保存失败不影响已经打开的链接
+        }
     }
 
     /// <summary>取消：淡出后退出，不打开任何浏览器</summary>
@@ -290,6 +351,28 @@ public partial class PickerWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e) => Cancel();
 
     private void Copy_Click(object sender, RoutedEventArgs e) => CopyLink();
+
+    private void Qr_Click(object sender, RoutedEventArgs e) => ToggleQr();
+
+    /// <summary>
+    /// 展开 / 收起链接的二维码。二维码画在弹窗内部而不是新窗口，
+    /// 所以不会引起弹窗失去焦点而被取消；按钮不抢焦点，磁贴的键盘选中状态保持不变。
+    /// </summary>
+    private void ToggleQr(bool? show = null)
+    {
+        if (_uri is null) return;
+        bool open = show ?? QrPanel.Visibility != Visibility.Visible;
+
+        // 第一次展开时才生成
+        if (open && QrImage.Source is null && QrHint.Text.Length == 0)
+        {
+            var image = QrCodeHelper.Create(_uri.AbsoluteUri);
+            QrImage.Source = image;
+            if (QrImage.Parent is FrameworkElement box) box.Visibility = image is null ? Visibility.Collapsed : Visibility.Visible; // 过长时只显示提示
+            QrHint.Text = Loc.Get(image is null ? "S.Qr.TooLong" : "S.Qr.Hint");
+        }
+        QrPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     /// <summary>复制链接到剪贴板，并在按钮上给出反馈</summary>
     private void CopyLink()

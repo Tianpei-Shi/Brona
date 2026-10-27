@@ -50,6 +50,10 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool SetForegroundWindow(IntPtr hWnd);
 
+    /// <summary>读取按键的实时状态（高位为 1 表示当前按下），程序刚启动、还没有窗口时也可用</summary>
+    [LibraryImport("user32.dll")]
+    public static partial short GetAsyncKeyState(int vKey);
+
     [LibraryImport("user32.dll")]
     public static partial void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 

@@ -23,6 +23,16 @@ public sealed class BrowserEntry
     /// </summary>
     public string? PrivateArguments { get; set; }
 
+    /// <summary>
+    /// 多用户配置的名称（如 Chrome 的「工作」）。空表示浏览器的默认启动方式。
+    /// 同一个 exe 可以有多个不同配置的条目，靠它区分。
+    /// </summary>
+    public string Profile { get; set; } = "";
+
+    /// <summary>条目的唯一键（exe|启动参数），用于使用统计、记住上次选择和规则定位</summary>
+    [JsonIgnore]
+    public string Key => $"{ExePath}|{Arguments}";
+
     /// <summary>是否支持无痕模式</summary>
     [JsonIgnore]
     public bool SupportsPrivate => !string.IsNullOrWhiteSpace(PrivateArguments);
@@ -55,4 +65,11 @@ public sealed class BrowserEntry
     /// <summary>判断两个条目是否指向同一个浏览器程序</summary>
     public bool SameExe(BrowserEntry other) =>
         string.Equals(ExePath, other.ExePath, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 判断两个条目是否是同一项：同一个程序且同一个用户配置。
+    /// 去重请用它而不是 SameExe，否则同一浏览器的多个配置条目会被当成重复项误删。
+    /// </summary>
+    public bool SameEntry(BrowserEntry other) =>
+        SameExe(other) && string.Equals(Profile ?? "", other.Profile ?? "", StringComparison.OrdinalIgnoreCase);
 }
